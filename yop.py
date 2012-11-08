@@ -9,18 +9,15 @@ class Yop(object):
     def __init__(self, username=None, url='http://www.yopmail.com', lang='en', version='2.2'):
         self.url = url
         self.lang = lang
-        self.mails = None
         self.version = version
         self.username = username
         self.session = requests.session(prefetch=True)
 
     def list_mails(self):
-        if not self.mails:
-            payload = {'login': self.username, 'v': self.version}
-            r = self.session.get(join(self.url, self.lang, 'inbox.php'), params=payload)
-            self.mails = self._compress(self._parse_list_mails(r.content))
+        payload = {'login': self.username, 'v': self.version}
+        r = self.session.get(join(self.url, self.lang, 'inbox.php'), params=payload)
 
-        return self.mails
+        return self._compress(self._parse_list_mails(r.content))
 
     def _parse_list_mails(self, source):
         html = bs4(source)
@@ -83,4 +80,6 @@ class Yop(object):
             else:
                 day.append(i)
                 day[1] += 1
+        mails.append(day)
+
         return [(i[0], i[1], i[2:]) for i in mails[1:]]
