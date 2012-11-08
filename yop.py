@@ -65,10 +65,10 @@ class Yop(object):
         return results
         #return [self.session.get(link.get('href')) for link in message.find_all('a')[:None]]
 
-    def one_click(self):
+    def click_last_mail(self, limit=1):
         last_mail_id = self.list_mails()[0][2][0][-1]
 
-        return self.click_mail(last_mail_id, 1)
+        return self.click_mail(last_mail_id, limit)
 
     def _compress(self, l):
         mails = []
