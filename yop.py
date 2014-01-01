@@ -2,28 +2,31 @@
 
 import requests
 from os.path import join
+from dateutil import parser
+from collections import OrderedDict
 from bs4 import BeautifulSoup as bs4
 
 
 class Yop(object):
-    def __init__(self, username=None, url='http://www.yopmail.com', lang='en', version='2.2'):
-        self.url = url
-        self.lang = lang
-        self.version = version
-        self.username = username
-        self.session = requests.session(prefetch=True)
+    def __init__(self, username=None, url='http://www.yopmail.com/', lang='en', id_fix=u'm'):
+        self._url = url
+        self._lang = lang
+        self._username = username
+        self._id_fix = id_fix
+        self._session = requests.Session()
+        self._session.stream = False
 
     def list_mails(self):
-        payload = {'login': self.username, 'v': self.version}
-        r = self.session.get(join(self.url, self.lang, 'inbox.php'), params=payload)
+        payload = {'login': self._username}
+        r = self._session.get(join(self._url, self._lang, 'rss.php'), params=payload)
 
-        return self._compress(self._parse_list_mails(r.content))
+        return self._compress(self._parse_list_mails(r.text))
 
     def _parse_list_mails(self, source):
-        html = bs4(source)
-        messages = html.find_all('div', lambda c: c == 'jour' or c == 'm')
+        html = bs4(source, 'lxml')
+        messages = html.find_all('item')
 
-        return [self._parse_elem(i) for i in messages]
+        return [[m.find('pubdate').get_text(), m.find('dc:creator').get_text(), m.find('title').get_text(), self._id_fix + m.find('guid').get_text()] for m in messages]
 
     def _parse_elem(self, elem):
         if 'jour' in elem.attrs.get('class'):
@@ -33,7 +36,7 @@ class Yop(object):
 
     def get_mail(self, mail_id):
         payload = {'id': mail_id}
-        r = self.session.get(join(self.url, self.lang, 'mail.php'), params=payload)
+        r = self._session.get(join(self._url, self._lang, 'mail.php'), params=payload)
 
         return self._parse_get_mail(r.content)
 
@@ -56,30 +59,36 @@ class Yop(object):
         results = []
 
         for link in message.find_all('a')[:limit]:
-            url = link.get('href')
+            title, url = link.get_text(), link.get('href')
+            print title
+            print url
             try:
-                results += [self.session.get(url)]
+                r = self._session.get(url)
+                print r.status_code
+                results += [r]
             except:
-                pass
+                print 'Error'
 
         return results
-        #return [self.session.get(link.get('href')) for link in message.find_all('a')[:None]]
 
     def click_last_mail(self, limit=1):
-        last_mail_id = self.list_mails()[0][2][0][-1]
+        last_mail_id = self.list_mails().itervalues().next()[0][-1]
 
         return self.click_mail(last_mail_id, limit)
 
-    def _compress(self, l):
-        mails = []
-        day = []
-        for i in l:
-            if isinstance(i, basestring):
-                mails.append(day)
-                day = [i, 0]
-            else:
-                day.append(i)
-                day[1] += 1
-        mails.append(day)
+    def _parse_timestamp(self, stamp):
+        p = parser.parse(stamp)
 
-        return [(i[0], i[1], i[2:]) for i in mails[1:]]
+        return (p.date(), p.time())
+
+    def _compress(self, ms):
+        mails = OrderedDict()
+        for m in ms:
+            d, t = self._parse_timestamp(m[0])
+            m[0] = t
+            if d in mails:
+                mails[d].append(m)
+            else:
+                mails.setdefault(d, [m])
+
+        return mails
