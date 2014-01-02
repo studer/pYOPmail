@@ -8,7 +8,7 @@ from bs4 import BeautifulSoup as bs4
 
 
 class Yop(object):
-    def __init__(self, username=None, url='http://www.yopmail.com/', lang='en', id_fix=u'm'):
+    def __init__(self, username, url='http://www.yopmail.com/', lang='en', id_fix=u'm'):
         self._url = url
         self._lang = lang
         self._username = username
@@ -28,17 +28,11 @@ class Yop(object):
 
         return [[m.find('pubdate').get_text(), m.find('dc:creator').get_text(), m.find('title').get_text(), self._id_fix + m.find('guid').get_text()] for m in messages]
 
-    def _parse_elem(self, elem):
-        if 'jour' in elem.attrs.get('class'):
-            return elem.get_text().capitalize()
-        else:
-            return [i.get_text() for i in elem.find_all('span')[1:]] + [elem.a.get('href').split('id=')[-1]]
-
     def get_mail(self, mail_id):
         payload = {'id': mail_id}
         r = self._session.get(join(self._url, self._lang, 'mail.php'), params=payload)
 
-        return self._parse_get_mail(r.content)
+        return self._parse_get_mail(r.text)
 
     def _parse_get_mail(self, source):
         html = bs4(source)
@@ -47,7 +41,7 @@ class Yop(object):
         for i in message.find_all('script'):
             i.decompose()
 
-        message.find_all('span')[-1].decompose()
+        #message.find_all('span')[-1].decompose()
 
         return message
 
@@ -76,8 +70,8 @@ class Yop(object):
 
         return self.click_mail(last_mail_id, limit)
 
-    def _parse_timestamp(self, stamp):
-        p = parser.parse(stamp)
+    def _parse_timestamp(self, timestamp):
+        p = parser.parse(timestamp)
 
         return (p.date(), p.time())
 
