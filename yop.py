@@ -1,8 +1,9 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
 import requests
 from os.path import join
-from dateutil import parser
+from dateutil import parser, tz
 from collections import OrderedDict
 from bs4 import BeautifulSoup as bs4
 
@@ -36,12 +37,15 @@ class Yop(object):
 
     def _parse_get_mail(self, source):
         html = bs4(source)
+
+        cryptogram = html.find('img', id='cryptogram')
+        if cryptogram:
+            raise Exception('Cryptogram presents')
+
         message = html.find('div', id='mailmillieu')
 
         for i in message.find_all('script'):
             i.decompose()
-
-        #message.find_all('span')[-1].decompose()
 
         return message
 
@@ -66,14 +70,23 @@ class Yop(object):
         return results
 
     def click_last_mail(self, limit=1):
-        last_mail_id = self.list_mails().itervalues().next()[0][-1]
+        last_mail = self.list_mails().itervalues().next()[0]
+        last_mail_time = last_mail[0]
+        last_mail_sender = last_mail[1]
+        last_mail_title = last_mail[2]
+        last_mail_id = last_mail[3]
+
+        print last_mail_time
+        print last_mail_sender
+        print last_mail_title
 
         return self.click_mail(last_mail_id, limit)
 
     def _parse_timestamp(self, timestamp):
         p = parser.parse(timestamp)
+        local = p.astimezone(tz.tzlocal())
 
-        return (p.date(), p.time())
+        return (local.date(), local.time())
 
     def _compress(self, ms):
         mails = OrderedDict()
@@ -86,3 +99,12 @@ class Yop(object):
                 mails.setdefault(d, [m])
 
         return mails
+
+if __name__ == '__main__':
+    import sys
+    try:
+        user = sys.argv[1]
+    except:
+        user = raw_input('User : ')
+    y = Yop(user)
+    y.click_last_mail()
