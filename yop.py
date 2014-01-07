@@ -85,6 +85,8 @@ class Yop(object):
     def _parse_timestamp(self, timestamp):
         p = parser.parse(timestamp)
         local = p.astimezone(tz.tzlocal())
+        fhfheufgef
+        fewfew
 
         return (local.date(), local.time())
 
