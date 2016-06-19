@@ -9,36 +9,37 @@ from bs4 import BeautifulSoup as bs4
 
 
 class Yop(object):
-    def __init__(self, username, url='http://www.yopmail.com/', lang='en', id_fix=u'm'):
+    def __init__(self, username, url='http://www.yopmail.com/', lang='en', id_fix=u'', version='2.6'):
         self._url = url
         self._lang = lang
         self._username = username
         self._id_fix = id_fix
+        self._version = version
         self._session = requests.Session()
         self._session.stream = False
 
     def list_mails(self):
-        payload = {'login': self._username}
-        r = self._session.get(join(self._url, self._lang, 'rss.php'), params=payload)
+        payload = {'login': self._username, 'v': self._version}
+        r = self._session.get(join(self._url, self._lang, 'inbox.php'), params=payload)
 
         return self._compress(self._parse_list_mails(r.text))
 
     def _parse_list_mails(self, source):
         html = bs4(source, 'lxml')
-        messages = html.find_all('item')
+        messages = html.find_all('div', class_='m')
 
-        return [[m.find('pubdate').get_text(), m.find('dc:creator').get_text(), m.find('title').get_text(), self._id_fix + m.find('guid').get_text()] for m in messages]
+        return [[m.find('span', class_='lmh').get_text(), m.find('span', class_='lmf').get_text(), m.find('span', class_='lms').get_text(), self._id_fix + m.find('a').get('href').split('id=')[-1]] for m in messages]
 
     def get_mail(self, mail_id):
-        payload = {'id': mail_id}
+        payload = {'b': self._username, 'id': mail_id}
         r = self._session.get(join(self._url, self._lang, 'mail.php'), params=payload)
 
         return self._parse_get_mail(r.text)
 
     def _parse_get_mail(self, source):
-        html = bs4(source)
+        html = bs4(source, 'lxml')
 
-        cryptogram = html.find('img', id='cryptogram')
+        cryptogram = html.find('span', class_='petit nb')
         if cryptogram:
             raise Exception('Cryptogram presents')
 
@@ -84,9 +85,9 @@ class Yop(object):
 
     def _parse_timestamp(self, timestamp):
         p = parser.parse(timestamp)
-        local = p.astimezone(tz.tzlocal())
+        #local = p.astimezone(tz.tzlocal())
 
-        return (local.date(), local.time())
+        return (p.date(), p.time())
 
     def _compress(self, ms):
         mails = OrderedDict()
